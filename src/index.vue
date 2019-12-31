@@ -1,6 +1,7 @@
 <template>
   <div
     class="json-editor"
+    ref="jsonEditor"
     @scroll="handleScroll"
   >
     <div
@@ -42,10 +43,10 @@ export default {
   components: {
     MyItem,
   },
+  name: 'json-editor',
   data() {
     return {
       flattenData: [],
-      // offset: 0,
       startRenderIndex: 0, // dom上开始渲染的元素索引
       curScrollTop: 0,
       oneScreenCnt: 0, // 当前屏幕最多可见数
@@ -86,6 +87,9 @@ export default {
     visibleData() {
       return this.flattenData.slice(this.startRenderIndex, this.startRenderIndex + this.renderCount);
     },
+  },
+  activated() {
+    this.$refs.jsonEditor.scrollTop = this.curScrollTop;
   },
   methods: {
     getOneScreenCnt() {
@@ -162,13 +166,19 @@ export default {
     },
     getType,
     handleScroll(e) {
-      const { scrollTop } = e.target;
-      const hasHiddenCnt = Number(Math.floor(scrollTop / ITEMHEIGHT));
-      if (hasHiddenCnt - this.startRenderIndex > this.topMaxCount) {
-        this.startRenderIndex = hasHiddenCnt - this.option.topRetainCount;
-      } else if ((this.startRenderIndex > 0) && (hasHiddenCnt - this.startRenderIndex < this.option.topRetainCount)) {
-        this.startRenderIndex = (hasHiddenCnt - this.topMaxCount < 0) ? 0 : (hasHiddenCnt - this.topMaxCount);
-      }
+      window.requestAnimationFrame(() => {
+        const { scrollTop } = e.target;
+        this.curScrollTop = scrollTop;
+        const hasHiddenCnt = Number(Math.floor(scrollTop / ITEMHEIGHT));
+        if (hasHiddenCnt - this.startRenderIndex > this.topMaxCount) {
+          this.startRenderIndex = hasHiddenCnt - this.option.topRetainCount;
+        } else if (
+          this.startRenderIndex > 0
+          && hasHiddenCnt - this.startRenderIndex < this.option.topRetainCount
+        ) {
+          this.startRenderIndex = hasHiddenCnt - this.topMaxCount < 0 ? 0 : hasHiddenCnt - this.topMaxCount;
+        }
+      });
     },
 
 
