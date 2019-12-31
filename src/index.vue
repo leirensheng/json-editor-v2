@@ -6,23 +6,22 @@
     <div
       class="fake-content"
       :style="{ height: contentHeight }"
-    >----------------------</div>
+    ></div>
     <div
-      :style="{ transform: `translateY(${offset}px)` }"
+      class="real-content"
+      :style="{ transform: `translateY(${topOffset}px)` }"
     >
       <div
         v-for="(item,index) in visibleData"
         :key="item.uniqueKey"
       >
         <my-item
-          :level="item.level"
-          :value="item.value"
           :bindKey="item.key"
           :item="item"
-          :type="item.type"
           :json="value"
+          v-bind="$attrs"
           @deleteChildren="handleDeleteChildren(index,item)"
-          @addAddBtn="(clickItem,parent )=>addAddBtn(index,clickItem,parent)"
+          @addAddBtn="(clickItem,parent)=>addAddBtn(index,clickItem,parent)"
           @addItem="addItem(index,item)"
           @deleteItem="deleteItem(index,item)"
           @changeRootType="changeRootType"
@@ -45,45 +44,61 @@ export default {
   },
   data() {
     return {
-      flattenTree: [],
-      visibleData: [],
-      offset: 0,
-      startIndex: 0, // 页面上可见的开始元素的索引
+      flattenData: [],
+      // offset: 0,
       startRenderIndex: 0, // dom上开始渲染的元素索引
       curScrollTop: 0,
+      oneScreenCnt: 0, // 当前屏幕最多可见数
     };
   },
   props: {
     value: {
       default: () => ({}),
     },
+    jsonName: {
+      default: () => 'root',
+    },
     option: {
       // 配置对象
       type: Object,
       default: () => ({
-        renderCount: 60,
-        topRetainCount: 17,
+        topRetainCount: 10, // 上面最小保留
+        cacheCount: 20, // 缓冲数
       }),
     },
   },
   computed: {
+    topMaxCount() {
+      return this.option.cacheCount + this.option.topRetainCount;
+    },
+    topOffset() {
+      return this.startRenderIndex * ITEMHEIGHT;
+    },
+    renderCount() {
+      return this.topMaxCount + Math.ceil(this.oneScreenCnt * 1.5);
+    },
     contentHeight() {
-      return `${this.flattenTree.length * ITEMHEIGHT}px`;
+      return `${this.flattenData.length * ITEMHEIGHT}px`;
     },
     levels() {
-      return this.flattenTree.map(one => one.level);
+      return this.flattenData.map(one => one.level);
+    },
+    visibleData() {
+      return this.flattenData.slice(this.startRenderIndex, this.startRenderIndex + this.renderCount);
     },
   },
   methods: {
+    getOneScreenCnt() {
+      this.oneScreenCnt = Math.floor(document.body.offsetHeight / ITEMHEIGHT);
+    },
     changeRootType(val) {
       this.$emit('input', val);
       this.refresh(val);
     },
     refresh(val) {
       this.$nextTick(() => {
-        this.flattenTree = [];
-        this.getFlatten(val);
-        this.updateVisibleData();
+        this.flattenData = [];
+        this.getFlattenData(val);
       });
     },
     getRandomId() {
@@ -91,21 +106,17 @@ export default {
         .toString(16)
         .slice(-6);
     },
-    handleDeleteChildren(index, item) {
+    handleDeleteChildren(index, { level }) {
       let count = 0;
-      const startIndex = index + 1 + this.startRenderIndex;
+      const indexOfTree = this.startRenderIndex + index;
+      const startIndex = indexOfTree + 1;
       let curIndex = startIndex;
-      const { level } = item;
-      while (this.flattenTree[curIndex] && this.flattenTree[curIndex].level > level) {
-        const cur = this.flattenTree[curIndex];
-        delete cur.children;
-        delete cur.parent;
+      while (this.flattenData[curIndex] && this.flattenData[curIndex].level > level) {
         count += 1;
         curIndex += 1;
       }
-      this.flattenTree.splice(startIndex, count);
-      delete this.flattenTree[index].children;
-      this.updateVisibleData(this.curScrollTop);
+      this.flattenData.splice(startIndex, count);
+      delete this.flattenData[indexOfTree].children;
     },
 
     addAddBtn(index, item, parent) {
@@ -116,14 +127,12 @@ export default {
         isAddBtn: true,
         uniqueId: this.getRandomId(),
       };
-      const startIndex = index + this.startRenderIndex + 1;
-      this.flattenTree.splice(startIndex, 0, addBtn);
-      this.updateVisibleData(this.curScrollTop);
+      const addIndex = index + this.startRenderIndex + 1;
+      this.flattenData.splice(addIndex, 0, addBtn);
     },
-    deleteItem(index, item) {
-      const {
-        parent, key, level, indexOfParent,
-      } = item;
+    deleteItem(index, {
+      parent, key, level, indexOfParent,
+    }) {
       const isArray = Array.isArray(parent);
       if (isArray) {
         parent.splice(indexOfParent, 1);
@@ -132,14 +141,14 @@ export default {
       }
       const indexOfTree = this.startRenderIndex + index;
       let curIndex = indexOfTree + 1;
-      let count = 1;
-      while (this.flattenTree[curIndex].level > level) {
-        count += 1;
+      let deleteCount = 1;
+      while (this.flattenData[curIndex].level > level) {
+        deleteCount += 1;
         curIndex += 1;
       }
 
-      while (this.flattenTree[curIndex] && this.flattenTree[curIndex].level >= level) {
-        const curItem = this.flattenTree[curIndex];
+      while (this.flattenData[curIndex] && this.flattenData[curIndex].level >= level) {
+        const curItem = this.flattenData[curIndex];
 
         if (curItem.level === level) {
           curItem.indexOfParent -= 1;
@@ -149,33 +158,19 @@ export default {
         }
         curIndex += 1;
       }
-      this.flattenTree.splice(indexOfTree, count);
-
-      this.updateVisibleData(this.curScrollTop);
+      this.flattenData.splice(indexOfTree, deleteCount);
     },
     getType,
     handleScroll(e) {
       const { scrollTop } = e.target;
-      window.requestAnimationFrame(() => {
-        this.updateVisibleData(scrollTop);
-        this.curScrollTop = scrollTop;
-      });
+      const hasHiddenCnt = Number(Math.floor(scrollTop / ITEMHEIGHT));
+      if (hasHiddenCnt - this.startRenderIndex > this.topMaxCount) {
+        this.startRenderIndex = hasHiddenCnt - this.option.topRetainCount;
+      } else if ((this.startRenderIndex > 0) && (hasHiddenCnt - this.startRenderIndex < this.option.topRetainCount)) {
+        this.startRenderIndex = (hasHiddenCnt - this.topMaxCount < 0) ? 0 : (hasHiddenCnt - this.topMaxCount);
+      }
     },
-    // 在dom上的元素
-    updateVisibleData(scrollTop = 0) {
-      const start = Math.floor(scrollTop / ITEMHEIGHT);
-      const startIndex = Number(start);
-      this.startIndex = startIndex; // 视图中可见索引
 
-      let startRenderIndex = startIndex; // 开始渲染的索引
-      startRenderIndex = startIndex > this.option.topRetainCount ? (startIndex - this.option.topRetainCount) : 0;
-      this.startRenderIndex = startRenderIndex;
-      const end = startRenderIndex + this.option.renderCount;
-      const diff = startRenderIndex - startIndex;
-
-      this.visibleData = this.flattenTree.slice(startRenderIndex, end);
-      this.offset = (startIndex + diff) * ITEMHEIGHT;
-    },
 
     addItem(index, item) {
       const {
@@ -184,7 +179,7 @@ export default {
       const indexOfTree = this.startRenderIndex + index;
       const isArray = Array.isArray(parent);
       if (!isArray) {
-        const preItem = this.flattenTree[indexOfTree - 1];
+        const preItem = this.flattenData[indexOfTree - 1];
         if (preItem.level === level && preItem.key === '') {
           this.$notification({
             message: '请先填写空的字段',
@@ -209,85 +204,51 @@ export default {
         parent.push('');
       }
 
-      this.flattenTree.splice(indexOfTree, 0, newItem);
-      this.updateVisibleData(this.curScrollTop);
+      this.flattenData.splice(indexOfTree, 0, newItem);
     },
     // parent 和 children都是保留原数据，非扁平化的
-    getFlatten(json) {
+    getFlattenData(json) {
       const flat = ({
         val, key, level, res, parent, indexOfParent,
       }) => {
         const type = this.getType(val);
-
-        if (type === 'object') {
-          const keys = Object.keys(val);
-          res.push({
-            key,
-            level,
-            parent,
-            indexOfParent,
-            children: val,
-            type,
-            uniqueId: this.getRandomId(),
-          });
-          const childLevel = level + 1;
-
-          keys.forEach((objKey, index) => {
-            flat({
-              val: val[objKey],
-              key: objKey,
-              level: childLevel,
-              res,
-              parent: val,
-              indexOfParent: index,
-            });
-          });
-
-          res.push({
-            level: childLevel,
-            parent: val,
-            indexOfParent: keys.length,
-            isAddBtn: true,
-            uniqueId: this.getRandomId(),
-          });
-        } else if (type === 'array') {
-          res.push({
-            key,
-            level,
-            parent,
-            indexOfParent,
-            children: val,
-            type,
-            uniqueId: this.getRandomId(),
-
-          });
-          const childLevel = level + 1;
-          val.forEach((one, index) => {
-            flat({
-              val: one,
-              key: index,
-              level: childLevel,
-              res,
-              parent: val,
-              indexOfParent: index,
-            });
-          });
-
-          res.push({
-            level: childLevel,
-            parent: val,
-            indexOfParent: val.length,
-            isAddBtn: true,
-            uniqueId: this.getRandomId(),
-          });
+        const isObject = type === 'object';
+        const isArray = type === 'array';
+        const isArrayOrObject = isObject || isArray;
+        const one = {
+          key,
+          level,
+          parent,
+          type,
+          indexOfParent,
+          uniqueId: this.getRandomId(),
+        };
+        if (isArrayOrObject) {
+          one.children = val;
         } else {
+          one.value = val;
+        }
+        res.push(one);
+
+        if (isArrayOrObject) {
+          const arr = isObject ? Object.keys(val) : val;
+          const childLevel = level + 1;
+          arr.forEach((item, index) => {
+            flat({
+              val: isObject ? val[item] : item,
+              key: isObject ? item : index,
+              level: childLevel,
+              res,
+              parent: val,
+              indexOfParent: index,
+            });
+          });
+
           res.push({
-            key,
-            value: val,
-            level,
-            parent,
-            type,
-            indexOfParent,
+            level: childLevel,
+            parent: val,
+            indexOfParent: arr.length,
+            isAddBtn: true,
             uniqueId: this.getRandomId(),
           });
         }
@@ -295,21 +256,17 @@ export default {
 
       flat({
         val: json,
-        key: '',
-        res: this.flattenTree,
+        key: this.jsonName,
+        res: this.flattenData,
         level: 0,
-        parent: null,
-        indexOfParent: null,
       });
     },
   },
   created() {
-    console.time(1);
-    this.getFlatten(this.value);
+    this.getFlattenData(this.value);
   },
   mounted() {
-    this.updateVisibleData();
-    console.timeEnd(1);
+    this.getOneScreenCnt();
   },
 };
 </script>
@@ -317,16 +274,20 @@ export default {
 <style scoped>
 .json-editor {
   position: relative;
-  height: 1080px;
+  height: 100%;
   max-height: 90vh;
   overflow-y: scroll;
-  /* padding: 10px 0; */
 }
 .fake-content {
   position: absolute;
   left: 0;
   top: 0;
   right: 0;
+}
+.real-content{
+  position: absolute;
+  left: 0;
+  top: 0;
 }
 
 </style>

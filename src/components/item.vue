@@ -1,7 +1,7 @@
 <template>
-  <div :style="{marginLeft: level*30+'px',position:'relative'}">
+  <div :style="{transform: `translateX(${level*30}px`,position:'relative'}">
     <span
-      v-for="one in levelArr"
+      v-for="one in level"
       :key="one"
       class="left-line"
       :style="getStyle(one)"
@@ -13,7 +13,7 @@
     >
       <XLine
         v-if="!isRoot"
-        style="position:relative;top:-1px"
+        style="position:relative;"
       />
       <span
         v-else
@@ -21,7 +21,7 @@
       />
       <!-- 字段名 -->
       <my-input
-        :value="isRoot ? jsonName : bindKey"
+        :value="bindKey"
         placeholder="字段"
         type="string"
         :disabled="isRoot || typeof bindKey === 'number'"
@@ -98,7 +98,7 @@
     </div>
     <add-btn
       style="padding-top:25px"
-      v-if="!type"
+      v-show="!type"
       @click="()=>this.$emit('addItem')"
     ></add-btn>
 
@@ -118,29 +118,39 @@ const MARGINLEFT = 30;
 export default {
   data() {
     return {
-      rootType: '',
     };
   },
   props: {
     bindKey: {
       type: [String, Number],
     },
-    value: {},
-    jsonName: {
-      default: () => 'root',
-    },
-    level: {},
-    type: {},
     item: {},
-
     json: {},
+    rootType: {
+      default: () => '',
+    },
   },
   computed: {
     isRoot() {
       return this.level === 0;
     },
-    levelArr() {
-      return Array.from({ length: this.level }, (val, index) => index + 1);
+    level() {
+      return this.item.level;
+    },
+    value() {
+      return this.item.value;
+    },
+    children() {
+      return this.item.children;
+    },
+    parent() {
+      return this.item.parent;
+    },
+    type() {
+      return this.item.type;
+    },
+    key() {
+      return this.item.key;
     },
   },
   mounted() {
@@ -155,7 +165,7 @@ export default {
   },
   methods: {
     getStyle(idx) {
-      const { length } = this.levelArr;
+      const length = this.level;
       const isFirstChild = idx === length && this.item.indexOfParent === 0;
       const height = isFirstChild ? PADDINGTOP + (ITEMHEIGHT - PADDINGTOP) / 2 : ITEMHEIGHT;
       const top = isFirstChild ? 0 : -PADDINGTOP / 2;
@@ -163,14 +173,12 @@ export default {
       return { height: `${height}px`, left: `${left}px`, top: `${top}px` };
     },
     updateVal(val) {
-      const { parent, key } = this.item;
       const newVal = this.type === 'boolean' ? val !== 'false' : val;
-      this.item.value = newVal;
-      this.$set(parent, key, newVal);
+      this.$set(this.item, 'value', newVal);
+      this.$set(this.parent, this.key, newVal);
     },
     validateKey(val) {
-      const { parent } = this.item;
-      const keys = Object.keys(parent);
+      const keys = Object.keys(this.parent);
       let message = '';
       if (val === '') {
         message = '字段名不能为空';
@@ -188,10 +196,9 @@ export default {
     },
 
     updateKey(val) {
-      const { parent, children, value } = this.item;
-      delete parent[this.bindKey];
+      delete this.parent[this.key];
       this.item.key = val;
-      this.$set(parent, val, children || value);
+      this.$set(this.parent, val, this.children || this.value);
     },
 
     getTypeValue(type) {
@@ -218,9 +225,8 @@ export default {
     },
     updateType(val) {
       const value = this.getTypeValue(val);
-
-      const { parent, key, level } = this.item;
-      if (level === 0) {
+      console.log(value);
+      if (this.isRoot) {
         this.$emit('changeRootType', value);
         return;
       }
@@ -230,14 +236,13 @@ export default {
 
       if (['object', 'array'].includes(val)) {
         this.$emit('addAddBtn', this.item, value);
-      }
-      this.$set(parent, key, value);
-      if (['object', 'array'].includes(val)) {
         delete this.item.value;
         this.item.children = value;
       } else {
-        this.item.value = value;
+        delete this.item.children;
+        this.$set(this.item, 'value', value);
       }
+      this.$set(this.parent, this.key, value);
       this.item.type = val;
     },
   },
@@ -251,7 +256,7 @@ export default {
   width: 1px;
   /* top: 0; */
   /* left:30px; */
-  background-color: black;
+  background-color: rgb(219, 203, 203);
 }
 .has-border {
   border-left: 1px solid rgb(219, 203, 203);
@@ -266,7 +271,6 @@ export default {
 .one-item {
   position: relative;
   padding-top: 25px;
-  top: -1px;
   display: flex;
   align-items: center;
   /* border-left: 1px solid red; */

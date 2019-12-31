@@ -1,18 +1,9 @@
 <template>
-  <el-select
-    v-bind="$attrs"
-    size="mini"
-    style="width:100px"
-    v-model="type"
-    class="select-type"
-    @change="handleChange"
-  >
-    <el-option
-      v-for="one in types"
-      :key="one.value"
-      :value="one.value"
-    >{{one.value}}</el-option>
-  </el-select>
+  <select v-bind="$attrs" style="width:100px" v-model="type"
+
+  class="select-type" @change="handleChange">
+    <option v-for="one in types" :key="one.value" :value="one.value">{{ one.value }}</option>
+  </select>
 </template>
 
 <script>
@@ -47,9 +38,10 @@ export default {
     },
   },
   methods: {
-    handleChange(val) {
-      this.$emit('input', val);
+    handleChange(e) {
+      this.$emit('input', e.target.value);
     },
+
   },
   watch: {
     value: {
@@ -58,9 +50,6 @@ export default {
       },
       immediate: true,
     },
-    // type(val) {
-    //   this.$emit('input', val);
-    // },
   },
 };
 </script>
@@ -69,5 +58,12 @@ export default {
 .select-type {
   position: relative;
   top: 2px;
+}
+
+select {
+  border-color: #c0c4cc;
+  border-radius: 4px;
+  padding: 4px;
+  color: #606266;
 }
 </style>

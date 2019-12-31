@@ -1,11 +1,7 @@
 <template>
   <div>
-    <div style="" >
-      <!-- <button style="margin-top:91px">abc</button>
-      <button>bcd</button> -->
+         <json-editor style="height:90vh"  v-model="json" ></json-editor>
 
-      <json-editor v-model="json" ></json-editor>
-    </div>
   </div>
 
 </template>

@@ -36,11 +36,12 @@ export default {
 <style scoped>
 .xLine{
   position: relative;
-  top:-10px;
+  top:-8px;
 }
 .icon{
   cursor: pointer;
   position: relative;
   left: -4px;
+  top:3px;
 }
 </style>
