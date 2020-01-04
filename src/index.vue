@@ -67,6 +67,9 @@ export default {
         cacheCount: 20, // 缓冲数
       }),
     },
+    schema: {
+      type: Object,
+    },
   },
   computed: {
     topMaxCount() {
@@ -102,7 +105,7 @@ export default {
     refresh(val) {
       this.$nextTick(() => {
         this.flattenData = [];
-        this.getFlattenData(val);
+        this.getFlattenData(val, this.flattenData);
       });
     },
     getRandomId() {
@@ -198,26 +201,38 @@ export default {
           return;
         }
       }
-
-      const newItem = {
-        value: '',
-        level,
-        parent,
-        type: 'string',
-        indexOfParent,
-        key: isArray ? indexOfParent : '',
-        uniqueId: this.getRandomId(),
-      };
-
-      item.indexOfParent += 1;
+      let flattenArr = [];
+      let copy = null;
+      if (this.schema && isArray && level === 1) {
+        copy = JSON.parse(JSON.stringify(this.schema));
+        this.getFlattenData(copy, flattenArr);
+        flattenArr.forEach((one, idx) => {
+          const isFirst = idx === 0;
+          one.key = isFirst ? parent.length : one.key;
+          one.indexOfParent = isFirst ? parent.length : one.indexOfParent;
+          one.parent = isFirst ? parent : one.parent;
+          one.level += level;
+        });
+      } else {
+        flattenArr = [{
+          value: '',
+          level,
+          parent,
+          type: 'string',
+          indexOfParent,
+          key: isArray ? indexOfParent : '',
+          uniqueId: this.getRandomId(),
+        }];
+      }
+      item.indexOfParent += flattenArr.length;
       if (isArray) {
-        parent.push('');
+        parent.push(copy || '');
       }
 
-      this.flattenData.splice(indexOfTree, 0, newItem);
+      this.flattenData.splice(indexOfTree, 0, ...flattenArr);
     },
     // parent 和 children都是保留原数据，非扁平化的
-    getFlattenData(json) {
+    getFlattenData(json, result) {
       const flat = ({
         val, key, level, res, parent, indexOfParent,
       }) => {
@@ -267,13 +282,13 @@ export default {
       flat({
         val: json,
         key: this.jsonName,
-        res: this.flattenData,
+        res: result,
         level: 0,
       });
     },
   },
   created() {
-    this.getFlattenData(this.value);
+    this.getFlattenData(this.value, this.flattenData);
   },
   mounted() {
     this.getOneScreenCnt();

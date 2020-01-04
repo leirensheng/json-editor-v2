@@ -1497,12 +1497,12 @@ export default {
     };
   },
   watch: {
-    // json: {
-    //   deep: true,
-    //   handler(val) {
-    //     // console.log(JSON.stringify(val, null, 4));
-    //   },
-    // },
+    json: {
+      deep: true,
+      handler(val) {
+        console.log(JSON.stringify(val, null, 4));
+      },
+    },
   },
   mounted() {},
   methods: {},
