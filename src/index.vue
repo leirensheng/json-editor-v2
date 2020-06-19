@@ -84,9 +84,6 @@ export default {
     contentHeight() {
       return `${this.flattenData.length * ITEMHEIGHT}px`;
     },
-    levels() {
-      return this.flattenData.map(one => one.level);
-    },
     visibleData() {
       return this.flattenData.slice(this.startRenderIndex, this.startRenderIndex + this.renderCount);
     },
@@ -96,7 +93,8 @@ export default {
   },
   methods: {
     getOneScreenCnt() {
-      this.oneScreenCnt = Math.floor(document.body.offsetHeight / ITEMHEIGHT);
+      const el = document.querySelector('.json-editor');
+      this.oneScreenCnt = Math.ceil(el.clientHeight / ITEMHEIGHT);
     },
     changeRootType(val) {
       this.$emit('input', val);
